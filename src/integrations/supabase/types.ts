@@ -1130,6 +1130,15 @@ export type Database = {
         Returns: boolean
       }
       seed_system_roles: { Args: { _org: string }; Returns: undefined }
+      voice_briefing_has_assignments: {
+        Args: { _briefing_id: string }
+        Returns: boolean
+      }
+      voice_briefing_is_assigned: {
+        Args: { _briefing_id: string; _user_id: string }
+        Returns: boolean
+      }
+      voice_briefing_org: { Args: { _briefing_id: string }; Returns: string }
     }
     Enums: {
       app_role:
