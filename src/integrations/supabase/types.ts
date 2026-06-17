@@ -14,6 +14,282 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_conversation_audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          conversation_id: string | null
+          created_at: string
+          id: string
+          metadata: Json
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversation_audit_logs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_conversation_participants: {
+        Row: {
+          added_by: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          permission: string
+          user_id: string
+        }
+        Insert: {
+          added_by?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          permission?: string
+          user_id: string
+        }
+        Update: {
+          added_by?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          permission?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversation_participants_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_conversation_tags: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          tag: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          tag: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          tag?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversation_tags_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_conversations: {
+        Row: {
+          archived: boolean
+          created_at: string
+          deleted_at: string | null
+          id: string
+          last_message_at: string | null
+          message_count: number
+          metadata: Json
+          model: string | null
+          organization_id: string | null
+          pinned: boolean
+          system_prompt: string | null
+          title: string
+          total_input_tokens: number
+          total_output_tokens: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          message_count?: number
+          metadata?: Json
+          model?: string | null
+          organization_id?: string | null
+          pinned?: boolean
+          system_prompt?: string | null
+          title?: string
+          total_input_tokens?: number
+          total_output_tokens?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          message_count?: number
+          metadata?: Json
+          model?: string | null
+          organization_id?: string | null
+          pinned?: boolean
+          system_prompt?: string | null
+          title?: string
+          total_input_tokens?: number
+          total_output_tokens?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_messages: {
+        Row: {
+          content: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          input_tokens: number | null
+          message_id: string | null
+          metadata: Json
+          model: string | null
+          output_tokens: number | null
+          parts: Json
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          input_tokens?: number | null
+          message_id?: string | null
+          metadata?: Json
+          model?: string | null
+          output_tokens?: number | null
+          parts?: Json
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          input_tokens?: number | null
+          message_id?: string | null
+          metadata?: Json
+          model?: string | null
+          output_tokens?: number | null
+          parts?: Json
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_export_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          downloaded_at: string | null
+          error: string | null
+          file_path: string | null
+          filters: Json
+          id: string
+          organization_id: string
+          requested_by: string
+          row_count: number | null
+          started_at: string | null
+          status: string
+          template: string | null
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          downloaded_at?: string | null
+          error?: string | null
+          file_path?: string | null
+          filters?: Json
+          id?: string
+          organization_id: string
+          requested_by: string
+          row_count?: number | null
+          started_at?: string | null
+          status?: string
+          template?: string | null
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          downloaded_at?: string | null
+          error?: string | null
+          file_path?: string | null
+          filters?: Json
+          id?: string
+          organization_id?: string
+          requested_by?: string
+          row_count?: number | null
+          started_at?: string | null
+          status?: string
+          template?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_export_jobs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collab_messages: {
         Row: {
           body: string
@@ -752,6 +1028,56 @@ export type Database = {
           },
         ]
       }
+      role_change_history: {
+        Row: {
+          action: string
+          changed_by: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          new_role: Database["public"]["Enums"]["app_role"] | null
+          organization_id: string
+          previous_role: Database["public"]["Enums"]["app_role"] | null
+          reason: string | null
+          source: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          new_role?: Database["public"]["Enums"]["app_role"] | null
+          organization_id: string
+          previous_role?: Database["public"]["Enums"]["app_role"] | null
+          reason?: string | null
+          source?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          new_role?: Database["public"]["Enums"]["app_role"] | null
+          organization_id?: string
+          previous_role?: Database["public"]["Enums"]["app_role"] | null
+          reason?: string | null
+          source?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_change_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           can_manage: boolean
@@ -793,6 +1119,76 @@ export type Database = {
           },
         ]
       }
+      role_requests: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          id: string
+          organization_id: string
+          reason: string | null
+          requested_role: Database["public"]["Enums"]["app_role"]
+          reviewed_at: string | null
+          reviewer_id: string | null
+          reviewer_note: string | null
+          signup_config_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          organization_id: string
+          reason?: string | null
+          requested_role: Database["public"]["Enums"]["app_role"]
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          reviewer_note?: string | null
+          signup_config_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          organization_id?: string
+          reason?: string | null
+          requested_role?: Database["public"]["Enums"]["app_role"]
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          reviewer_note?: string | null
+          signup_config_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_requests_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_requests_signup_config_id_fkey"
+            columns: ["signup_config_id"]
+            isOneToOne: false
+            referencedRelation: "signup_role_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settings_audit_log: {
         Row: {
           changes: Json
@@ -816,6 +1212,69 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      signup_role_configs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          current_user_count: number
+          department_id: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          label: string | null
+          max_users: number | null
+          organization_id: string
+          requires_approval: boolean
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          current_user_count?: number
+          department_id?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          max_users?: number | null
+          organization_id: string
+          requires_approval?: boolean
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          current_user_count?: number
+          department_id?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          max_users?: number | null
+          organization_id?: string
+          requires_approval?: boolean
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signup_role_configs_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signup_role_configs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tasks: {
         Row: {
@@ -1090,6 +1549,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ai_conversation_owner: { Args: { _conv: string }; Returns: string }
       delete_custom_role: {
         Args: { _org: string; _slug: string }
         Returns: undefined
@@ -1130,6 +1590,8 @@ export type Database = {
         Returns: boolean
       }
       seed_system_roles: { Args: { _org: string }; Returns: undefined }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       voice_briefing_has_assignments: {
         Args: { _briefing_id: string }
         Returns: boolean
