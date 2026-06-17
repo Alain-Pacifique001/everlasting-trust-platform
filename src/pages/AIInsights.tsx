@@ -571,6 +571,7 @@ const AIInsights = () => {
           </Button>
         </div>
       </Card>
+      </div>
     </div>
   );
 };
