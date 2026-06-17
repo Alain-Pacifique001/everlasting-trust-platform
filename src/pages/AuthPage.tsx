@@ -98,12 +98,32 @@ const AuthPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const role = signupRoles.find((r) => r.id === selectedRoleId);
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { data: { full_name: fullName }, emailRedirectTo: window.location.origin },
       });
       if (error) throw error;
+
+      // If we have an immediate session (auto-confirm) and a role was selected, create the role request.
+      if (role && data.session && data.user) {
+        const { error: rrErr } = await (supabase as any).from('role_requests').insert({
+          user_id: data.user.id,
+          organization_id: role.organization_id,
+          requested_role: role.role,
+          department_id: role.department_id,
+          signup_config_id: role.id,
+          status: role.requires_approval ? 'pending' : 'approved',
+          reason: 'Selected at signup',
+        });
+        if (rrErr) console.warn('role_request insert failed', rrErr);
+        toast.success(role.requires_approval
+          ? 'Signed up. Your role request is pending approval.'
+          : 'Signed up. Role granted.');
+        navigate('/dashboard');
+        return;
+      }
       toast.success(t('auth.checkEmail'));
     } catch (err: any) {
       toast.error(err.message);
@@ -111,6 +131,7 @@ const AuthPage = () => {
       setLoading(false);
     }
   };
+
 
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
