@@ -260,11 +260,11 @@ const AIInsights = () => {
 
   const send = async (text: string) => {
     if ((!text.trim() && pendingFiles.length === 0) || loading) return;
+    if (!user) { toast.error('Sign in required'); return; }
 
     const attachments = pendingFiles;
     const displayText = text.trim() || (attachments.length ? t('aiInsights.attachedFiles') : '');
 
-    // Build multimodal content for the API
     const parts: any[] = [];
     let combinedText = text.trim();
     const pdfs = attachments.filter(a => a.kind === 'pdf');
@@ -290,6 +290,32 @@ const AIInsights = () => {
     setInput('');
     setPendingFiles([]);
     setLoading(true);
+
+    // Persist: ensure a conversation, then save the user message
+    let convId = activeConvId;
+    try {
+      if (!convId) {
+        const title = (text.trim() || 'New conversation').slice(0, 60);
+        const { data: conv, error } = await (supabase as any)
+          .from('ai_conversations')
+          .insert({ user_id: user.id, organization_id: organization?.id ?? null, title, model: 'ai-insights' })
+          .select('id')
+          .single();
+        if (error) throw error;
+        convId = conv.id;
+        setActiveConvId(convId);
+      }
+      await (supabase as any).from('ai_messages').insert({
+        conversation_id: convId,
+        user_id: user.id,
+        role: 'user',
+        content: combinedText,
+        parts,
+        metadata: { display: displayText, attachments: attachments.map(a => ({ ...a, imageData: undefined })) },
+      });
+    } catch (err: any) {
+      console.warn('Persist user msg failed', err);
+    }
 
     try {
       const r = await fetch(`${SUPABASE_URL}/functions/v1/ai-insights`, {
@@ -340,12 +366,29 @@ const AIInsights = () => {
           }
         }
       }
+
+      // Persist final assistant message
+      if (convId && assistant) {
+        try {
+          await (supabase as any).from('ai_messages').insert({
+            conversation_id: convId,
+            user_id: user.id,
+            role: 'assistant',
+            content: assistant,
+            parts: [{ type: 'text', text: assistant }],
+          });
+          loadConversations();
+        } catch (err) {
+          console.warn('Persist assistant msg failed', err);
+        }
+      }
     } catch (e) {
       toast.error(t('aiInsights.connectionError'));
     } finally {
       setLoading(false);
     }
   };
+
 
   const renderUserMessage = (m: Message) => (
     <div className="space-y-2">
