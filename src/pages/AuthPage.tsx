@@ -335,16 +335,39 @@ const AuthPage = () => {
               </div>
             <form onSubmit={mode === 'login' ? handleLogin : handleSignup} className="space-y-4">
               {mode === 'signup' && (
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">{t('auth.fullName')}</Label>
-                  <Input
-                    id="fullName"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder={t('auth.namePlaceholder')}
-                    required
-                  />
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">{t('auth.fullName')}</Label>
+                    <Input
+                      id="fullName"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder={t('auth.namePlaceholder')}
+                      required
+                    />
+                  </div>
+                  {signupRoles.length > 0 && (
+                    <div className="space-y-2">
+                      <Label htmlFor="signupRole">Requested role</Label>
+                      <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+                        <SelectTrigger id="signupRole">
+                          <SelectValue placeholder="Select a role to request" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {signupRoles.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>
+                              {r.label ?? r.role}
+                              {r.requires_approval ? ' (approval required)' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedRoleId && signupRoles.find(r => r.id === selectedRoleId)?.description && (
+                        <p className="text-xs text-muted-foreground">{signupRoles.find(r => r.id === selectedRoleId)?.description}</p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
               <div className="space-y-2">
                 <Label htmlFor="email">{t('auth.email')}</Label>
