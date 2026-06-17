@@ -2,12 +2,23 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Sparkles, Send, Brain, Wallet, TrendingUp, Mic, MicOff, Paperclip, X, FileText, Image as ImageIcon, Volume2, Square } from 'lucide-react';
+import { Sparkles, Send, Brain, Wallet, TrendingUp, Mic, MicOff, Paperclip, X, FileText, Image as ImageIcon, Volume2, Square, Plus, MessageSquare, Pin, Archive, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+
+type Conversation = {
+  id: string;
+  title: string;
+  pinned: boolean;
+  archived: boolean;
+  last_message_at: string | null;
+  message_count: number;
+};
+
 
 interface Attachment {
   id: string;
@@ -61,6 +72,9 @@ const extractPdfText = async (file: File): Promise<string> => {
 const AIInsights = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { organization } = useOrganization();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -68,12 +82,65 @@ const AIInsights = () => {
   const [pendingFiles, setPendingFiles] = useState<Attachment[]>([]);
   const [listening, setListening] = useState(false);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
 
   // Stop any ongoing speech when leaving the page
   useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
+
+  const loadConversations = async () => {
+    if (!user) return;
+    const { data } = await (supabase as any)
+      .from('ai_conversations')
+      .select('id,title,pinned,archived,last_message_at,message_count')
+      .is('deleted_at', null)
+      .eq('archived', false)
+      .order('pinned', { ascending: false })
+      .order('last_message_at', { ascending: false, nullsFirst: false });
+    setConversations(data ?? []);
+  };
+
+  const loadMessages = async (convId: string) => {
+    const { data } = await (supabase as any)
+      .from('ai_messages')
+      .select('role,content,parts,metadata')
+      .eq('conversation_id', convId)
+      .order('created_at');
+    setMessages((data ?? []).map((m: any) => ({
+      role: m.role,
+      content: m.content ?? '',
+      display: m.metadata?.display,
+      attachments: m.metadata?.attachments,
+    })));
+  };
+
+  useEffect(() => { loadConversations(); }, [user?.id]);
+  useEffect(() => { if (activeConvId) loadMessages(activeConvId); }, [activeConvId]);
+
+  const newConversation = () => {
+    setActiveConvId(null);
+    setMessages([]);
+  };
+
+  const pinConv = async (id: string, pinned: boolean) => {
+    await (supabase as any).from('ai_conversations').update({ pinned: !pinned }).eq('id', id);
+    loadConversations();
+  };
+
+  const archiveConv = async (id: string) => {
+    await (supabase as any).from('ai_conversations').update({ archived: true }).eq('id', id);
+    if (activeConvId === id) newConversation();
+    loadConversations();
+  };
+
+  const deleteConv = async (id: string) => {
+    await (supabase as any).from('ai_conversations').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+    if (activeConvId === id) newConversation();
+    loadConversations();
+  };
+
 
   const stripMarkdown = (md: string) =>
     md
@@ -193,11 +260,11 @@ const AIInsights = () => {
 
   const send = async (text: string) => {
     if ((!text.trim() && pendingFiles.length === 0) || loading) return;
+    if (!user) { toast.error('Sign in required'); return; }
 
     const attachments = pendingFiles;
     const displayText = text.trim() || (attachments.length ? t('aiInsights.attachedFiles') : '');
 
-    // Build multimodal content for the API
     const parts: any[] = [];
     let combinedText = text.trim();
     const pdfs = attachments.filter(a => a.kind === 'pdf');
@@ -223,6 +290,32 @@ const AIInsights = () => {
     setInput('');
     setPendingFiles([]);
     setLoading(true);
+
+    // Persist: ensure a conversation, then save the user message
+    let convId = activeConvId;
+    try {
+      if (!convId) {
+        const title = (text.trim() || 'New conversation').slice(0, 60);
+        const { data: conv, error } = await (supabase as any)
+          .from('ai_conversations')
+          .insert({ user_id: user.id, organization_id: organization?.id ?? null, title, model: 'ai-insights' })
+          .select('id')
+          .single();
+        if (error) throw error;
+        convId = conv.id;
+        setActiveConvId(convId);
+      }
+      await (supabase as any).from('ai_messages').insert({
+        conversation_id: convId,
+        user_id: user.id,
+        role: 'user',
+        content: combinedText,
+        parts,
+        metadata: { display: displayText, attachments: attachments.map(a => ({ ...a, imageData: undefined })) },
+      });
+    } catch (err: any) {
+      console.warn('Persist user msg failed', err);
+    }
 
     try {
       const r = await fetch(`${SUPABASE_URL}/functions/v1/ai-insights`, {
@@ -273,12 +366,29 @@ const AIInsights = () => {
           }
         }
       }
+
+      // Persist final assistant message
+      if (convId && assistant) {
+        try {
+          await (supabase as any).from('ai_messages').insert({
+            conversation_id: convId,
+            user_id: user.id,
+            role: 'assistant',
+            content: assistant,
+            parts: [{ type: 'text', text: assistant }],
+          });
+          loadConversations();
+        } catch (err) {
+          console.warn('Persist assistant msg failed', err);
+        }
+      }
     } catch (e) {
       toast.error(t('aiInsights.connectionError'));
     } finally {
       setLoading(false);
     }
   };
+
 
   const renderUserMessage = (m: Message) => (
     <div className="space-y-2">
@@ -298,19 +408,49 @@ const AIInsights = () => {
     </div>
   );
 
+  const filteredConvs = conversations.filter(c => !search || c.title.toLowerCase().includes(search.toLowerCase()));
+
   return (
-    <div className="p-6 flex flex-col h-[calc(100vh-3rem)] max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
-          <Sparkles className="w-6 h-6 text-primary-foreground" />
+    <div className="p-6 flex gap-4 h-[calc(100vh-3rem)] max-w-6xl mx-auto">
+      {/* Sidebar */}
+      <aside className="hidden md:flex flex-col w-64 shrink-0 border rounded-lg bg-card overflow-hidden">
+        <div className="p-2 border-b space-y-2">
+          <Button size="sm" className="w-full" onClick={newConversation}>
+            <Plus className="w-4 h-4 mr-1" /> New chat
+          </Button>
+          <Input placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} className="h-8" />
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">{t('aiInsights.title')}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t('aiInsights.subtitle', { count: portfolio.length })}
-          </p>
+        <div className="flex-1 overflow-y-auto p-1 space-y-1">
+          {filteredConvs.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-4">No conversations yet</p>
+          )}
+          {filteredConvs.map(c => (
+            <div key={c.id} className={`group flex items-center gap-1 rounded px-2 py-1.5 text-sm cursor-pointer hover:bg-accent ${activeConvId === c.id ? 'bg-accent' : ''}`}>
+              <button onClick={() => setActiveConvId(c.id)} className="flex-1 text-left flex items-center gap-2 min-w-0">
+                <MessageSquare className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{c.title}</span>
+                {c.pinned && <Pin className="w-3 h-3 text-primary shrink-0" />}
+              </button>
+              <button onClick={() => pinConv(c.id, c.pinned)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-primary" title="Pin"><Pin className="w-3 h-3" /></button>
+              <button onClick={() => archiveConv(c.id)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-primary" title="Archive"><Archive className="w-3 h-3" /></button>
+              <button onClick={() => deleteConv(c.id)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-destructive" title="Delete"><Trash2 className="w-3 h-3" /></button>
+            </div>
+          ))}
         </div>
-      </div>
+      </aside>
+
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
+            <Sparkles className="w-6 h-6 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">{t('aiInsights.title')}</h1>
+            <p className="text-sm text-muted-foreground">
+              {t('aiInsights.subtitle', { count: portfolio.length })}
+            </p>
+          </div>
+        </div>
 
       <Card className="flex-1 flex flex-col overflow-hidden">
         <CardContent className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
@@ -431,6 +571,7 @@ const AIInsights = () => {
           </Button>
         </div>
       </Card>
+      </div>
     </div>
   );
 };

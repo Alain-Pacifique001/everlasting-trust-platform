@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,9 +7,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/sonner';
 import { Loader2, Eye, EyeOff, ShieldCheck, KeyRound, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+type SignupRoleOption = {
+  id: string;
+  organization_id: string;
+  role: string;
+  label: string | null;
+  description: string | null;
+  requires_approval: boolean;
+  department_id: string | null;
+  max_users: number | null;
+  current_user_count: number;
+};
+
 
 const hashCode = async (code: string): Promise<string> => {
   const data = new TextEncoder().encode(code);
@@ -28,6 +42,21 @@ const AuthPage = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [signupRoles, setSignupRoles] = useState<SignupRoleOption[]>([]);
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+
+  useEffect(() => {
+    if (mode !== 'signup') return;
+    (supabase as any)
+      .from('signup_role_configs')
+      .select('id,organization_id,role,label,description,requires_approval,department_id,max_users,current_user_count')
+      .eq('is_active', true)
+      .then(({ data }: { data: SignupRoleOption[] | null }) => {
+        const filtered = (data ?? []).filter((r) => r.max_users == null || r.current_user_count < r.max_users);
+        setSignupRoles(filtered);
+      });
+  }, [mode]);
+
 
   // MFA state — surfaced after a successful password sign-in if a TOTP factor is required
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
@@ -69,12 +98,32 @@ const AuthPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const role = signupRoles.find((r) => r.id === selectedRoleId);
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { data: { full_name: fullName }, emailRedirectTo: window.location.origin },
       });
       if (error) throw error;
+
+      // If we have an immediate session (auto-confirm) and a role was selected, create the role request.
+      if (role && data.session && data.user) {
+        const { error: rrErr } = await (supabase as any).from('role_requests').insert({
+          user_id: data.user.id,
+          organization_id: role.organization_id,
+          requested_role: role.role,
+          department_id: role.department_id,
+          signup_config_id: role.id,
+          status: role.requires_approval ? 'pending' : 'approved',
+          reason: 'Selected at signup',
+        });
+        if (rrErr) console.warn('role_request insert failed', rrErr);
+        toast.success(role.requires_approval
+          ? 'Signed up. Your role request is pending approval.'
+          : 'Signed up. Role granted.');
+        navigate('/dashboard');
+        return;
+      }
       toast.success(t('auth.checkEmail'));
     } catch (err: any) {
       toast.error(err.message);
@@ -82,6 +131,7 @@ const AuthPage = () => {
       setLoading(false);
     }
   };
+
 
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,16 +335,39 @@ const AuthPage = () => {
               </div>
             <form onSubmit={mode === 'login' ? handleLogin : handleSignup} className="space-y-4">
               {mode === 'signup' && (
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">{t('auth.fullName')}</Label>
-                  <Input
-                    id="fullName"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder={t('auth.namePlaceholder')}
-                    required
-                  />
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">{t('auth.fullName')}</Label>
+                    <Input
+                      id="fullName"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder={t('auth.namePlaceholder')}
+                      required
+                    />
+                  </div>
+                  {signupRoles.length > 0 && (
+                    <div className="space-y-2">
+                      <Label htmlFor="signupRole">Requested role</Label>
+                      <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+                        <SelectTrigger id="signupRole">
+                          <SelectValue placeholder="Select a role to request" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {signupRoles.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>
+                              {r.label ?? r.role}
+                              {r.requires_approval ? ' (approval required)' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedRoleId && signupRoles.find(r => r.id === selectedRoleId)?.description && (
+                        <p className="text-xs text-muted-foreground">{signupRoles.find(r => r.id === selectedRoleId)?.description}</p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
               <div className="space-y-2">
                 <Label htmlFor="email">{t('auth.email')}</Label>

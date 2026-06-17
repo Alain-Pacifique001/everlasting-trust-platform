@@ -23,6 +23,8 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import SettingsPage from "./pages/SettingsPage";
 import RoleManagementPage from "./pages/RoleManagementPage";
+import RoleRequestsPage from "./pages/RoleRequestsPage";
+import SignupRoleConfigPage from "./pages/SignupRoleConfigPage";
 import EnterprisePage from "./pages/EnterprisePage";
 import AuthPage from "./pages/AuthPage";
 import ResetPassword from "./pages/ResetPassword";
@@ -87,6 +89,8 @@ const OrgGate = () => {
         <Route path="/organization" element={<EnterprisePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/roles" element={<RoleManagementPage />} />
+        <Route path="/role-requests" element={<RoleRequestsPage />} />
+        <Route path="/signup-roles" element={<SignupRoleConfigPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
