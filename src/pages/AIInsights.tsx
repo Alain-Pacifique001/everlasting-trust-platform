@@ -2,12 +2,23 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Sparkles, Send, Brain, Wallet, TrendingUp, Mic, MicOff, Paperclip, X, FileText, Image as ImageIcon, Volume2, Square } from 'lucide-react';
+import { Sparkles, Send, Brain, Wallet, TrendingUp, Mic, MicOff, Paperclip, X, FileText, Image as ImageIcon, Volume2, Square, Plus, MessageSquare, Pin, Archive, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+
+type Conversation = {
+  id: string;
+  title: string;
+  pinned: boolean;
+  archived: boolean;
+  last_message_at: string | null;
+  message_count: number;
+};
+
 
 interface Attachment {
   id: string;
@@ -61,6 +72,9 @@ const extractPdfText = async (file: File): Promise<string> => {
 const AIInsights = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { organization } = useOrganization();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -68,12 +82,65 @@ const AIInsights = () => {
   const [pendingFiles, setPendingFiles] = useState<Attachment[]>([]);
   const [listening, setListening] = useState(false);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
 
   // Stop any ongoing speech when leaving the page
   useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
+
+  const loadConversations = async () => {
+    if (!user) return;
+    const { data } = await (supabase as any)
+      .from('ai_conversations')
+      .select('id,title,pinned,archived,last_message_at,message_count')
+      .is('deleted_at', null)
+      .eq('archived', false)
+      .order('pinned', { ascending: false })
+      .order('last_message_at', { ascending: false, nullsFirst: false });
+    setConversations(data ?? []);
+  };
+
+  const loadMessages = async (convId: string) => {
+    const { data } = await (supabase as any)
+      .from('ai_messages')
+      .select('role,content,parts,metadata')
+      .eq('conversation_id', convId)
+      .order('created_at');
+    setMessages((data ?? []).map((m: any) => ({
+      role: m.role,
+      content: m.content ?? '',
+      display: m.metadata?.display,
+      attachments: m.metadata?.attachments,
+    })));
+  };
+
+  useEffect(() => { loadConversations(); }, [user?.id]);
+  useEffect(() => { if (activeConvId) loadMessages(activeConvId); }, [activeConvId]);
+
+  const newConversation = () => {
+    setActiveConvId(null);
+    setMessages([]);
+  };
+
+  const pinConv = async (id: string, pinned: boolean) => {
+    await (supabase as any).from('ai_conversations').update({ pinned: !pinned }).eq('id', id);
+    loadConversations();
+  };
+
+  const archiveConv = async (id: string) => {
+    await (supabase as any).from('ai_conversations').update({ archived: true }).eq('id', id);
+    if (activeConvId === id) newConversation();
+    loadConversations();
+  };
+
+  const deleteConv = async (id: string) => {
+    await (supabase as any).from('ai_conversations').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+    if (activeConvId === id) newConversation();
+    loadConversations();
+  };
+
 
   const stripMarkdown = (md: string) =>
     md
