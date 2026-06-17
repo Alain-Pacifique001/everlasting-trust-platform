@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+
 
 const languages = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -45,9 +47,17 @@ const LanguageSelector = ({ collapsed = false }: { collapsed?: boolean }) => {
             {languages.map((lang) => (
               <button
                 key={lang.code}
-                onClick={() => {
+                onClick={async () => {
                   i18n.changeLanguage(lang.code);
                   setOpen(false);
+                  try {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                      const { data: existing } = await supabase.from('user_settings').select('preferences').eq('user_id', user.id).maybeSingle();
+                      const prefs = (existing?.preferences as any) ?? {};
+                      await supabase.from('user_settings').update({ preferences: { ...prefs, language: lang.code } }).eq('user_id', user.id);
+                    }
+                  } catch { /* non-blocking */ }
                 }}
                 className={cn(
                   'w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
