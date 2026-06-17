@@ -42,6 +42,21 @@ const AuthPage = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [signupRoles, setSignupRoles] = useState<SignupRoleOption[]>([]);
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+
+  useEffect(() => {
+    if (mode !== 'signup') return;
+    (supabase as any)
+      .from('signup_role_configs')
+      .select('id,organization_id,role,label,description,requires_approval,department_id,max_users,current_user_count')
+      .eq('is_active', true)
+      .then(({ data }: { data: SignupRoleOption[] | null }) => {
+        const filtered = (data ?? []).filter((r) => r.max_users == null || r.current_user_count < r.max_users);
+        setSignupRoles(filtered);
+      });
+  }, [mode]);
+
 
   // MFA state — surfaced after a successful password sign-in if a TOTP factor is required
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
