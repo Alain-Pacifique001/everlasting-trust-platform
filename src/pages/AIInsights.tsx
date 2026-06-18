@@ -96,13 +96,14 @@ const AIInsights = () => {
     if (!user) return;
     const { data } = await (supabase as any)
       .from('ai_conversations')
-      .select('id,title,pinned,archived,last_message_at,message_count')
+      .select('id,title,pinned,archived,last_message_at,message_count,user_id')
       .is('deleted_at', null)
       .eq('archived', false)
       .order('pinned', { ascending: false })
       .order('last_message_at', { ascending: false, nullsFirst: false });
     setConversations(data ?? []);
   };
+
 
   const loadMessages = async (convId: string) => {
     const { data } = await (supabase as any)
