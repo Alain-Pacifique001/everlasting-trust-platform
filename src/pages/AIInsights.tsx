@@ -6,9 +6,10 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Sparkles, Send, Brain, Wallet, TrendingUp, Mic, MicOff, Paperclip, X, FileText, Image as ImageIcon, Volume2, Square, Plus, MessageSquare, Pin, Archive, Trash2 } from 'lucide-react';
+import { Sparkles, Send, Brain, Wallet, TrendingUp, Mic, MicOff, Paperclip, X, FileText, Image as ImageIcon, Volume2, Square, Plus, MessageSquare, Pin, Archive, Trash2, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+import AIConversationShareDialog from '@/components/ai/AIConversationShareDialog';
 
 type Conversation = {
   id: string;
@@ -17,7 +18,9 @@ type Conversation = {
   archived: boolean;
   last_message_at: string | null;
   message_count: number;
+  user_id: string;
 };
+
 
 
 interface Attachment {
@@ -75,6 +78,7 @@ const AIInsights = () => {
   const { organization } = useOrganization();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [shareConv, setShareConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -94,13 +98,14 @@ const AIInsights = () => {
     if (!user) return;
     const { data } = await (supabase as any)
       .from('ai_conversations')
-      .select('id,title,pinned,archived,last_message_at,message_count')
+      .select('id,title,pinned,archived,last_message_at,message_count,user_id')
       .is('deleted_at', null)
       .eq('archived', false)
       .order('pinned', { ascending: false })
       .order('last_message_at', { ascending: false, nullsFirst: false });
     setConversations(data ?? []);
   };
+
 
   const loadMessages = async (convId: string) => {
     const { data } = await (supabase as any)
@@ -432,12 +437,24 @@ const AIInsights = () => {
                 {c.pinned && <Pin className="w-3 h-3 text-primary shrink-0" />}
               </button>
               <button onClick={() => pinConv(c.id, c.pinned)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-primary" title="Pin"><Pin className="w-3 h-3" /></button>
+              {user?.id === c.user_id && (
+                <button onClick={() => setShareConv(c)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-primary" title="Share"><Share2 className="w-3 h-3" /></button>
+              )}
               <button onClick={() => archiveConv(c.id)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-primary" title="Archive"><Archive className="w-3 h-3" /></button>
               <button onClick={() => deleteConv(c.id)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-destructive" title="Delete"><Trash2 className="w-3 h-3" /></button>
             </div>
           ))}
         </div>
       </aside>
+      {shareConv && user && (
+        <AIConversationShareDialog
+          open={!!shareConv}
+          onOpenChange={(v) => !v && setShareConv(null)}
+          conversationId={shareConv.id}
+          ownerId={shareConv.user_id}
+          currentUserId={user.id}
+        />
+      )}
 
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center gap-3 mb-4">

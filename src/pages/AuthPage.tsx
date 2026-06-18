@@ -44,6 +44,9 @@ const AuthPage = () => {
   const [fullName, setFullName] = useState('');
   const [signupRoles, setSignupRoles] = useState<SignupRoleOption[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+  const [signupKind, setSignupKind] = useState<'join' | 'create'>('join');
+  const [newOrgName, setNewOrgName] = useState('');
+  const [newOrgType, setNewOrgType] = useState('business');
 
   useEffect(() => {
     if (mode !== 'signup') return;
@@ -98,7 +101,12 @@ const AuthPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const role = signupRoles.find((r) => r.id === selectedRoleId);
+      if (signupKind === 'create') {
+        if (!newOrgName.trim() || newOrgName.trim().length < 2) {
+          throw new Error('Organization name must be at least 2 characters');
+        }
+      }
+      const role = signupKind === 'join' ? signupRoles.find((r) => r.id === selectedRoleId) : undefined;
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -106,21 +114,36 @@ const AuthPage = () => {
       });
       if (error) throw error;
 
-      // If we have an immediate session (auto-confirm) and a role was selected, create the role request.
-      if (role && data.session && data.user) {
-        const { error: rrErr } = await (supabase as any).from('role_requests').insert({
-          user_id: data.user.id,
-          organization_id: role.organization_id,
-          requested_role: role.role,
-          department_id: role.department_id,
-          signup_config_id: role.id,
-          status: role.requires_approval ? 'pending' : 'approved',
-          reason: 'Selected at signup',
-        });
-        if (rrErr) console.warn('role_request insert failed', rrErr);
-        toast.success(role.requires_approval
-          ? 'Signed up. Your role request is pending approval.'
-          : 'Signed up. Role granted.');
+      if (data.session && data.user) {
+        if (signupKind === 'create') {
+          // Create org → trigger auto-grants Owner role and seeds system roles.
+          const { data: org, error: orgErr } = await supabase.from('organizations').insert({
+            name: newOrgName.trim(),
+            type: newOrgType,
+            created_by: data.user.id,
+          }).select('id').single();
+          if (orgErr) throw orgErr;
+          toast.success(`Organization "${newOrgName.trim()}" created — you're the Owner.`);
+          navigate('/dashboard');
+          return;
+        }
+        if (role) {
+          const { error: rrErr } = await (supabase as any).from('role_requests').insert({
+            user_id: data.user.id,
+            organization_id: role.organization_id,
+            requested_role: role.role,
+            department_id: role.department_id,
+            signup_config_id: role.id,
+            status: role.requires_approval ? 'pending' : 'approved',
+            reason: 'Selected at signup',
+          });
+          if (rrErr) console.warn('role_request insert failed', rrErr);
+          toast.success(role.requires_approval
+            ? 'Signed up. Your role request is pending approval.'
+            : 'Signed up. Role granted.');
+          navigate('/dashboard');
+          return;
+        }
         navigate('/dashboard');
         return;
       }
@@ -131,6 +154,7 @@ const AuthPage = () => {
       setLoading(false);
     }
   };
+
 
 
   const handleForgot = async (e: React.FormEvent) => {
@@ -346,7 +370,36 @@ const AuthPage = () => {
                       required
                     />
                   </div>
-                  {signupRoles.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Organization</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button type="button" variant={signupKind === 'join' ? 'default' : 'outline'} size="sm"
+                        onClick={() => setSignupKind('join')}>Join existing</Button>
+                      <Button type="button" variant={signupKind === 'create' ? 'default' : 'outline'} size="sm"
+                        onClick={() => setSignupKind('create')}>Create new</Button>
+                    </div>
+                  </div>
+                  {signupKind === 'create' ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="newOrgName">Organization name</Label>
+                        <Input id="newOrgName" value={newOrgName} onChange={(e) => setNewOrgName(e.target.value)}
+                          placeholder="Acme Inc." required minLength={2} maxLength={120} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="newOrgType">Type</Label>
+                        <Select value={newOrgType} onValueChange={setNewOrgType}>
+                          <SelectTrigger id="newOrgType"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="business">Business</SelectItem>
+                            <SelectItem value="personal">Personal</SelectItem>
+                            <SelectItem value="nonprofit">Non-profit</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <p className="text-xs text-muted-foreground">You'll be set as <strong>Owner</strong> of the new organization automatically.</p>
+                    </>
+                  ) : signupRoles.length > 0 ? (
                     <div className="space-y-2">
                       <Label htmlFor="signupRole">Requested role</Label>
                       <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
@@ -366,6 +419,8 @@ const AuthPage = () => {
                         <p className="text-xs text-muted-foreground">{signupRoles.find(r => r.id === selectedRoleId)?.description}</p>
                       )}
                     </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">After signing up you'll be prompted to enter a join code from your admin.</p>
                   )}
                 </>
               )}

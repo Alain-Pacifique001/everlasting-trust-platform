@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { History, Download, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { History, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuditLog } from '@/hooks/useRbac';
+import AuditExportPanel from './AuditExportPanel';
 
 const PAGE_SIZE = 25;
 const EVENTS = ['all', 'role.create', 'role.rename', 'role.delete', 'permissions.update', 'user.role_change'];
@@ -33,25 +34,13 @@ export default function AuditLogTab() {
   const { rows, count, loading } = useAuditLog(filters);
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
 
-  const exportCsv = () => {
-    const header = ['created_at','event_type','actor_email','target_role','target_user_id','ip_address','previous_value','new_value'];
-    const lines = [header.join(',')];
-    rows.forEach((r) => {
-      const cells = [
-        r.created_at, r.event_type, r.actor_email ?? '', r.target_role ?? '',
-        r.target_user_id ?? '', r.ip_address ?? '',
-        JSON.stringify(r.previous_value ?? null), JSON.stringify(r.new_value ?? null),
-      ].map((v) => `"${String(v).replace(/"/g, '""')}"`);
-      lines.push(cells.join(','));
-    });
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `rbac-audit-${Date.now()}.csv`; a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
+    <div className="space-y-4">
+    <AuditExportPanel filters={{
+      from_date: from || undefined,
+      to_date: to || undefined,
+      action_type: event !== 'all' ? event : undefined,
+    }} />
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3">
         <div>
@@ -60,9 +49,6 @@ export default function AuditLogTab() {
           </CardTitle>
           <CardDescription>Every role and permission change, with actor and IP address.</CardDescription>
         </div>
-        <Button variant="outline" size="sm" className="gap-2" onClick={exportCsv} disabled={rows.length === 0}>
-          <Download className="w-4 h-4" /> Export CSV
-        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -142,5 +128,6 @@ export default function AuditLogTab() {
         </div>
       </CardContent>
     </Card>
+    </div>
   );
 }

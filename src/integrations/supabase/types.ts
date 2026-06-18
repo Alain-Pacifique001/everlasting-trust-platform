@@ -1549,6 +1549,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ai_conversation_can_edit: {
+        Args: { _conv: string; _user: string }
+        Returns: boolean
+      }
+      ai_conversation_can_view: {
+        Args: { _conv: string; _user: string }
+        Returns: boolean
+      }
       ai_conversation_owner: { Args: { _conv: string }; Returns: string }
       delete_custom_role: {
         Args: { _org: string; _slug: string }
@@ -1560,6 +1568,14 @@ export type Database = {
           id: string
           name: string
           type: string
+        }[]
+      }
+      find_user_by_email: {
+        Args: { _email: string }
+        Returns: {
+          email: string
+          full_name: string
+          user_id: string
         }[]
       }
       generate_join_code: { Args: never; Returns: string }
