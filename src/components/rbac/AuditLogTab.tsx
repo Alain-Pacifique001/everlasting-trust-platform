@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { History, Download, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { History, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuditLog } from '@/hooks/useRbac';
+import AuditExportPanel from './AuditExportPanel';
 
 const PAGE_SIZE = 25;
 const EVENTS = ['all', 'role.create', 'role.rename', 'role.delete', 'permissions.update', 'user.role_change'];
