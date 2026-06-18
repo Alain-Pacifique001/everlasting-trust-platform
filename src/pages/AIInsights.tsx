@@ -17,7 +17,9 @@ type Conversation = {
   archived: boolean;
   last_message_at: string | null;
   message_count: number;
+  user_id: string;
 };
+
 
 
 interface Attachment {
