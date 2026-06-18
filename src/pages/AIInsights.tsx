@@ -6,9 +6,10 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Sparkles, Send, Brain, Wallet, TrendingUp, Mic, MicOff, Paperclip, X, FileText, Image as ImageIcon, Volume2, Square, Plus, MessageSquare, Pin, Archive, Trash2 } from 'lucide-react';
+import { Sparkles, Send, Brain, Wallet, TrendingUp, Mic, MicOff, Paperclip, X, FileText, Image as ImageIcon, Volume2, Square, Plus, MessageSquare, Pin, Archive, Trash2, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+import AIConversationShareDialog from '@/components/ai/AIConversationShareDialog';
 
 type Conversation = {
   id: string;
