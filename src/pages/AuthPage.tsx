@@ -370,7 +370,36 @@ const AuthPage = () => {
                       required
                     />
                   </div>
-                  {signupRoles.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Organization</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button type="button" variant={signupKind === 'join' ? 'default' : 'outline'} size="sm"
+                        onClick={() => setSignupKind('join')}>Join existing</Button>
+                      <Button type="button" variant={signupKind === 'create' ? 'default' : 'outline'} size="sm"
+                        onClick={() => setSignupKind('create')}>Create new</Button>
+                    </div>
+                  </div>
+                  {signupKind === 'create' ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="newOrgName">Organization name</Label>
+                        <Input id="newOrgName" value={newOrgName} onChange={(e) => setNewOrgName(e.target.value)}
+                          placeholder="Acme Inc." required minLength={2} maxLength={120} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="newOrgType">Type</Label>
+                        <Select value={newOrgType} onValueChange={setNewOrgType}>
+                          <SelectTrigger id="newOrgType"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="business">Business</SelectItem>
+                            <SelectItem value="personal">Personal</SelectItem>
+                            <SelectItem value="nonprofit">Non-profit</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <p className="text-xs text-muted-foreground">You'll be set as <strong>Owner</strong> of the new organization automatically.</p>
+                    </>
+                  ) : signupRoles.length > 0 ? (
                     <div className="space-y-2">
                       <Label htmlFor="signupRole">Requested role</Label>
                       <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
@@ -390,6 +419,8 @@ const AuthPage = () => {
                         <p className="text-xs text-muted-foreground">{signupRoles.find(r => r.id === selectedRoleId)?.description}</p>
                       )}
                     </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">After signing up you'll be prompted to enter a join code from your admin.</p>
                   )}
                 </>
               )}
