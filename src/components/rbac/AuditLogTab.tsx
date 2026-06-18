@@ -128,5 +128,6 @@ export default function AuditLogTab() {
         </div>
       </CardContent>
     </Card>
+    </div>
   );
 }
