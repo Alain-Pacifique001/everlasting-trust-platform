@@ -101,7 +101,12 @@ const AuthPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const role = signupRoles.find((r) => r.id === selectedRoleId);
+      if (signupKind === 'create') {
+        if (!newOrgName.trim() || newOrgName.trim().length < 2) {
+          throw new Error('Organization name must be at least 2 characters');
+        }
+      }
+      const role = signupKind === 'join' ? signupRoles.find((r) => r.id === selectedRoleId) : undefined;
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -109,21 +114,36 @@ const AuthPage = () => {
       });
       if (error) throw error;
 
-      // If we have an immediate session (auto-confirm) and a role was selected, create the role request.
-      if (role && data.session && data.user) {
-        const { error: rrErr } = await (supabase as any).from('role_requests').insert({
-          user_id: data.user.id,
-          organization_id: role.organization_id,
-          requested_role: role.role,
-          department_id: role.department_id,
-          signup_config_id: role.id,
-          status: role.requires_approval ? 'pending' : 'approved',
-          reason: 'Selected at signup',
-        });
-        if (rrErr) console.warn('role_request insert failed', rrErr);
-        toast.success(role.requires_approval
-          ? 'Signed up. Your role request is pending approval.'
-          : 'Signed up. Role granted.');
+      if (data.session && data.user) {
+        if (signupKind === 'create') {
+          // Create org → trigger auto-grants Owner role and seeds system roles.
+          const { data: org, error: orgErr } = await supabase.from('organizations').insert({
+            name: newOrgName.trim(),
+            type: newOrgType,
+            created_by: data.user.id,
+          }).select('id').single();
+          if (orgErr) throw orgErr;
+          toast.success(`Organization "${newOrgName.trim()}" created — you're the Owner.`);
+          navigate('/dashboard');
+          return;
+        }
+        if (role) {
+          const { error: rrErr } = await (supabase as any).from('role_requests').insert({
+            user_id: data.user.id,
+            organization_id: role.organization_id,
+            requested_role: role.role,
+            department_id: role.department_id,
+            signup_config_id: role.id,
+            status: role.requires_approval ? 'pending' : 'approved',
+            reason: 'Selected at signup',
+          });
+          if (rrErr) console.warn('role_request insert failed', rrErr);
+          toast.success(role.requires_approval
+            ? 'Signed up. Your role request is pending approval.'
+            : 'Signed up. Role granted.');
+          navigate('/dashboard');
+          return;
+        }
         navigate('/dashboard');
         return;
       }
@@ -134,6 +154,7 @@ const AuthPage = () => {
       setLoading(false);
     }
   };
+
 
 
   const handleForgot = async (e: React.FormEvent) => {
