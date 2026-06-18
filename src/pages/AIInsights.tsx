@@ -437,12 +437,24 @@ const AIInsights = () => {
                 {c.pinned && <Pin className="w-3 h-3 text-primary shrink-0" />}
               </button>
               <button onClick={() => pinConv(c.id, c.pinned)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-primary" title="Pin"><Pin className="w-3 h-3" /></button>
+              {user?.id === c.user_id && (
+                <button onClick={() => setShareConv(c)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-primary" title="Share"><Share2 className="w-3 h-3" /></button>
+              )}
               <button onClick={() => archiveConv(c.id)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-primary" title="Archive"><Archive className="w-3 h-3" /></button>
               <button onClick={() => deleteConv(c.id)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-destructive" title="Delete"><Trash2 className="w-3 h-3" /></button>
             </div>
           ))}
         </div>
       </aside>
+      {shareConv && user && (
+        <AIConversationShareDialog
+          open={!!shareConv}
+          onOpenChange={(v) => !v && setShareConv(null)}
+          conversationId={shareConv.id}
+          ownerId={shareConv.user_id}
+          currentUserId={user.id}
+        />
+      )}
 
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center gap-3 mb-4">
