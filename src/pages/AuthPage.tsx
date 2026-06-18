@@ -44,6 +44,9 @@ const AuthPage = () => {
   const [fullName, setFullName] = useState('');
   const [signupRoles, setSignupRoles] = useState<SignupRoleOption[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+  const [signupKind, setSignupKind] = useState<'join' | 'create'>('join');
+  const [newOrgName, setNewOrgName] = useState('');
+  const [newOrgType, setNewOrgType] = useState('business');
 
   useEffect(() => {
     if (mode !== 'signup') return;
