@@ -44,10 +44,23 @@ type Filters = {
   action_type?: string;
 };
 
-const validate = (body: any): { ok: true; data: Filters; mode: "queue" | "download" } | { ok: false; error: string } => {
+type ValidationOk =
+  | { ok: true; mode: "queue" | "download"; data: Filters }
+  | { ok: true; mode: "cancel"; organization_id: string; job_id: string; reason?: string };
+
+const validate = (body: any): ValidationOk | { ok: false; error: string } => {
   if (!body || typeof body !== "object") return { ok: false, error: "Body required" };
-  const { organization_id, from_date, to_date, user_id, role, module, action_type, mode } = body;
+  const { organization_id, mode } = body;
   if (typeof organization_id !== "string" || !UUID.test(organization_id)) return { ok: false, error: "Invalid organization_id" };
+
+  if (mode === "cancel") {
+    const job_id = body.job_id;
+    if (typeof job_id !== "string" || !UUID.test(job_id)) return { ok: false, error: "Invalid job_id" };
+    const reason = typeof body.reason === "string" ? String(body.reason).slice(0, 500) : undefined;
+    return { ok: true, mode: "cancel", organization_id, job_id, reason };
+  }
+
+  const { from_date, to_date, user_id, role, module, action_type } = body;
   if (from_date && !ISO.test(String(from_date))) return { ok: false, error: "Invalid from_date" };
   if (to_date && !ISO.test(String(to_date))) return { ok: false, error: "Invalid to_date" };
   if (user_id && !UUID.test(String(user_id))) return { ok: false, error: "Invalid user_id" };
@@ -57,6 +70,11 @@ const validate = (body: any): { ok: true; data: Filters; mode: "queue" | "downlo
   const m = mode === "download" ? "download" : "queue";
   return { ok: true, mode: m, data: { organization_id, from_date, to_date, user_id, role, module, action_type } };
 };
+
+async function isCancelRequested(svc: any, jobId: string): Promise<boolean> {
+  const { data } = await svc.from("audit_export_jobs").select("status,cancellation_requested_at").eq("id", jobId).maybeSingle();
+  return !!data && (data.status === "cancelled" || data.cancellation_requested_at != null);
+}
 
 async function* fetchRowsInBatches(svc: any, f: Filters) {
   const PAGE = 1000;
@@ -99,15 +117,40 @@ const rowToCsv = (r: any, p: any): string =>
   ].map(csvEscape).join(",");
 
 async function buildAndUpload(svc: any, jobId: string, f: Filters): Promise<void> {
+  // Re-check cancellation before starting work
+  if (await isCancelRequested(svc, jobId)) {
+    await svc.from("audit_export_jobs").update({
+      status: "cancelled",
+      completed_at: new Date().toISOString(),
+    }).eq("id", jobId).neq("status", "cancelled");
+    return;
+  }
   await svc.from("audit_export_jobs").update({ status: "running", started_at: new Date().toISOString() }).eq("id", jobId);
   try {
     let total = 0;
     const lines: string[] = [COLUMNS.join(",")];
     for await (const batch of fetchRowsInBatches(svc, f)) {
+      // Check for cancellation between batches to prevent partial/corrupted uploads
+      if (await isCancelRequested(svc, jobId)) {
+        await svc.from("audit_export_jobs").update({
+          status: "cancelled",
+          completed_at: new Date().toISOString(),
+          row_count: total,
+        }).eq("id", jobId);
+        return;
+      }
       for (const r of batch.rows) {
         lines.push(rowToCsv(r, batch.profiles.get(r.actor_user_id)));
         total++;
       }
+    }
+    if (await isCancelRequested(svc, jobId)) {
+      await svc.from("audit_export_jobs").update({
+        status: "cancelled",
+        completed_at: new Date().toISOString(),
+        row_count: total,
+      }).eq("id", jobId);
+      return;
     }
     const path = `${f.organization_id}/${jobId}.csv`;
     const body = new TextEncoder().encode(lines.join("\n"));
@@ -116,6 +159,16 @@ async function buildAndUpload(svc: any, jobId: string, f: Filters): Promise<void
       upsert: true,
     });
     if (upErr) throw upErr;
+    // Final cancellation check — if cancelled after upload, remove the file
+    if (await isCancelRequested(svc, jobId)) {
+      await svc.storage.from("audit-exports").remove([path]).catch(() => {});
+      await svc.from("audit_export_jobs").update({
+        status: "cancelled",
+        completed_at: new Date().toISOString(),
+        row_count: total,
+      }).eq("id", jobId);
+      return;
+    }
     await svc.from("audit_export_jobs").update({
       status: "completed",
       row_count: total,
@@ -154,14 +207,38 @@ Deno.serve(async (req) => {
     const svc = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     // Authorization: must be owner/ceo/auditor of organization_id (server-side check, do not trust client).
+    const orgId = v.mode === "cancel" ? v.organization_id : v.data.organization_id;
     const { data: member } = await svc
       .from("organization_members")
       .select("role")
       .eq("user_id", user.id)
-      .eq("organization_id", v.data.organization_id)
+      .eq("organization_id", orgId)
       .maybeSingle();
     if (!member || !["owner", "ceo", "auditor"].includes(member.role)) {
       return json(403, { error: "Forbidden" });
+    }
+
+    if (v.mode === "cancel") {
+      const { data: job, error: fetchErr } = await svc
+        .from("audit_export_jobs")
+        .select("id,status,file_path,organization_id")
+        .eq("id", v.job_id)
+        .eq("organization_id", orgId)
+        .maybeSingle();
+      if (fetchErr || !job) return json(404, { error: "Job not found" });
+      if (job.status === "completed" || job.status === "failed" || job.status === "cancelled") {
+        return json(409, { error: `Cannot cancel a ${job.status} job`, status: job.status });
+      }
+      const nowIso = new Date().toISOString();
+      const { error: updErr } = await svc.from("audit_export_jobs").update({
+        cancellation_requested_at: nowIso,
+        cancelled_by: user.id,
+        cancellation_reason: v.reason ?? null,
+        // If still queued, flip to cancelled immediately. If running, the worker loop will flip it.
+        ...(job.status === "queued" ? { status: "cancelled", completed_at: nowIso } : {}),
+      }).eq("id", v.job_id);
+      if (updErr) return json(500, { error: updErr.message });
+      return json(200, { ok: true, job_id: v.job_id, status: job.status === "queued" ? "cancelled" : "cancelling" });
     }
 
     if (v.mode === "queue") {
