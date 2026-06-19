@@ -207,14 +207,38 @@ Deno.serve(async (req) => {
     const svc = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     // Authorization: must be owner/ceo/auditor of organization_id (server-side check, do not trust client).
+    const orgId = v.mode === "cancel" ? v.organization_id : v.data.organization_id;
     const { data: member } = await svc
       .from("organization_members")
       .select("role")
       .eq("user_id", user.id)
-      .eq("organization_id", v.data.organization_id)
+      .eq("organization_id", orgId)
       .maybeSingle();
     if (!member || !["owner", "ceo", "auditor"].includes(member.role)) {
       return json(403, { error: "Forbidden" });
+    }
+
+    if (v.mode === "cancel") {
+      const { data: job, error: fetchErr } = await svc
+        .from("audit_export_jobs")
+        .select("id,status,file_path,organization_id")
+        .eq("id", v.job_id)
+        .eq("organization_id", orgId)
+        .maybeSingle();
+      if (fetchErr || !job) return json(404, { error: "Job not found" });
+      if (job.status === "completed" || job.status === "failed" || job.status === "cancelled") {
+        return json(409, { error: `Cannot cancel a ${job.status} job`, status: job.status });
+      }
+      const nowIso = new Date().toISOString();
+      const { error: updErr } = await svc.from("audit_export_jobs").update({
+        cancellation_requested_at: nowIso,
+        cancelled_by: user.id,
+        cancellation_reason: v.reason ?? null,
+        // If still queued, flip to cancelled immediately. If running, the worker loop will flip it.
+        ...(job.status === "queued" ? { status: "cancelled", completed_at: nowIso } : {}),
+      }).eq("id", v.job_id);
+      if (updErr) return json(500, { error: updErr.message });
+      return json(200, { ok: true, job_id: v.job_id, status: job.status === "queued" ? "cancelled" : "cancelling" });
     }
 
     if (v.mode === "queue") {
