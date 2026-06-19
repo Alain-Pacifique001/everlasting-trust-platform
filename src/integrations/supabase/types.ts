@@ -233,6 +233,9 @@ export type Database = {
       }
       audit_export_jobs: {
         Row: {
+          cancellation_reason: string | null
+          cancellation_requested_at: string | null
+          cancelled_by: string | null
           completed_at: string | null
           created_at: string
           downloaded_at: string | null
@@ -249,6 +252,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancellation_reason?: string | null
+          cancellation_requested_at?: string | null
+          cancelled_by?: string | null
           completed_at?: string | null
           created_at?: string
           downloaded_at?: string | null
@@ -265,6 +271,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancellation_reason?: string | null
+          cancellation_requested_at?: string | null
+          cancelled_by?: string | null
           completed_at?: string | null
           created_at?: string
           downloaded_at?: string | null
