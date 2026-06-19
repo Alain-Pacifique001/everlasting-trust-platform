@@ -44,10 +44,23 @@ type Filters = {
   action_type?: string;
 };
 
-const validate = (body: any): { ok: true; data: Filters; mode: "queue" | "download" } | { ok: false; error: string } => {
+type ValidationOk =
+  | { ok: true; mode: "queue" | "download"; data: Filters }
+  | { ok: true; mode: "cancel"; organization_id: string; job_id: string; reason?: string };
+
+const validate = (body: any): ValidationOk | { ok: false; error: string } => {
   if (!body || typeof body !== "object") return { ok: false, error: "Body required" };
-  const { organization_id, from_date, to_date, user_id, role, module, action_type, mode } = body;
+  const { organization_id, mode } = body;
   if (typeof organization_id !== "string" || !UUID.test(organization_id)) return { ok: false, error: "Invalid organization_id" };
+
+  if (mode === "cancel") {
+    const job_id = body.job_id;
+    if (typeof job_id !== "string" || !UUID.test(job_id)) return { ok: false, error: "Invalid job_id" };
+    const reason = typeof body.reason === "string" ? String(body.reason).slice(0, 500) : undefined;
+    return { ok: true, mode: "cancel", organization_id, job_id, reason };
+  }
+
+  const { from_date, to_date, user_id, role, module, action_type } = body;
   if (from_date && !ISO.test(String(from_date))) return { ok: false, error: "Invalid from_date" };
   if (to_date && !ISO.test(String(to_date))) return { ok: false, error: "Invalid to_date" };
   if (user_id && !UUID.test(String(user_id))) return { ok: false, error: "Invalid user_id" };
@@ -57,6 +70,11 @@ const validate = (body: any): { ok: true; data: Filters; mode: "queue" | "downlo
   const m = mode === "download" ? "download" : "queue";
   return { ok: true, mode: m, data: { organization_id, from_date, to_date, user_id, role, module, action_type } };
 };
+
+async function isCancelRequested(svc: any, jobId: string): Promise<boolean> {
+  const { data } = await svc.from("audit_export_jobs").select("status,cancellation_requested_at").eq("id", jobId).maybeSingle();
+  return !!data && (data.status === "cancelled" || data.cancellation_requested_at != null);
+}
 
 async function* fetchRowsInBatches(svc: any, f: Filters) {
   const PAGE = 1000;
