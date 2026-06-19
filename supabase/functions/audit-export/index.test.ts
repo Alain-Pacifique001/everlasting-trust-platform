@@ -135,3 +135,73 @@ Deno.test("non-member of any org is denied (403)", async () => {
     await f.admin.auth.admin.deleteUser(u.user!.id);
   } finally { await f.cleanup(); }
 });
+
+Deno.test("cancel: rejects bad job_id (400)", async () => {
+  if (skipIfNoServiceRole()) return;
+  const f = await setupFixture();
+  try {
+    const r = await callExport(f.ownerToken, { mode: "cancel", organization_id: f.orgA, job_id: "nope" });
+    assertEquals(r.status, 400);
+  } finally { await f.cleanup(); }
+});
+
+Deno.test("cancel: 404 when the job does not exist", async () => {
+  if (skipIfNoServiceRole()) return;
+  const f = await setupFixture();
+  try {
+    const r = await callExport(f.ownerToken, {
+      mode: "cancel", organization_id: f.orgA, job_id: crypto.randomUUID(),
+    });
+    assertEquals(r.status, 404);
+  } finally { await f.cleanup(); }
+});
+
+Deno.test("cancel: queues then cancels a job and persists status", async () => {
+  if (skipIfNoServiceRole()) return;
+  const f = await setupFixture();
+  try {
+    // Enqueue
+    const enq = await callExport(f.ownerToken, { organization_id: f.orgA, mode: "queue" });
+    assertEquals(enq.status, 202);
+    const jobId = (enq.body as any).job_id as string;
+
+    // Cancel
+    const cancel = await callExport(f.ownerToken, {
+      mode: "cancel", organization_id: f.orgA, job_id: jobId, reason: "test",
+    });
+    // Could be 200 (cancelled / cancelling) or 409 if it already completed (org has 0 rows → very fast)
+    if (cancel.status !== 200 && cancel.status !== 409) {
+      throw new Error(`Unexpected cancel status ${cancel.status}: ${JSON.stringify(cancel.body)}`);
+    }
+
+    // Verify persistence: row must be in a terminal state
+    const { data: job } = await f.admin
+      .from("audit_export_jobs")
+      .select("status,cancellation_requested_at,cancelled_by")
+      .eq("id", jobId)
+      .single();
+    if (cancel.status === 200) {
+      // Either cancelled outright, or cancellation_requested_at is set
+      if (!(job?.status === "cancelled" || job?.cancellation_requested_at)) {
+        throw new Error(`Expected cancellation marker, got ${JSON.stringify(job)}`);
+      }
+      assertEquals(job?.cancelled_by, f.ownerUserId);
+    }
+  } finally { await f.cleanup(); }
+});
+
+Deno.test("cancel: cross-org cancel attempt is denied (403)", async () => {
+  if (skipIfNoServiceRole()) return;
+  const f = await setupFixture();
+  try {
+    // Create a job in orgA as owner
+    const enq = await callExport(f.ownerToken, { organization_id: f.orgA, mode: "queue" });
+    const jobId = (enq.body as any).job_id;
+    // Other user (member of orgB only) tries to cancel it via orgA → 403
+    const r = await callExport(f.otherToken, {
+      mode: "cancel", organization_id: f.orgA, job_id: jobId,
+    });
+    assertEquals(r.status, 403);
+  } finally { await f.cleanup(); }
+});
+
