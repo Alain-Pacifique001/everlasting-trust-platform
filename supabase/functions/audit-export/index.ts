@@ -117,15 +117,40 @@ const rowToCsv = (r: any, p: any): string =>
   ].map(csvEscape).join(",");
 
 async function buildAndUpload(svc: any, jobId: string, f: Filters): Promise<void> {
+  // Re-check cancellation before starting work
+  if (await isCancelRequested(svc, jobId)) {
+    await svc.from("audit_export_jobs").update({
+      status: "cancelled",
+      completed_at: new Date().toISOString(),
+    }).eq("id", jobId).neq("status", "cancelled");
+    return;
+  }
   await svc.from("audit_export_jobs").update({ status: "running", started_at: new Date().toISOString() }).eq("id", jobId);
   try {
     let total = 0;
     const lines: string[] = [COLUMNS.join(",")];
     for await (const batch of fetchRowsInBatches(svc, f)) {
+      // Check for cancellation between batches to prevent partial/corrupted uploads
+      if (await isCancelRequested(svc, jobId)) {
+        await svc.from("audit_export_jobs").update({
+          status: "cancelled",
+          completed_at: new Date().toISOString(),
+          row_count: total,
+        }).eq("id", jobId);
+        return;
+      }
       for (const r of batch.rows) {
         lines.push(rowToCsv(r, batch.profiles.get(r.actor_user_id)));
         total++;
       }
+    }
+    if (await isCancelRequested(svc, jobId)) {
+      await svc.from("audit_export_jobs").update({
+        status: "cancelled",
+        completed_at: new Date().toISOString(),
+        row_count: total,
+      }).eq("id", jobId);
+      return;
     }
     const path = `${f.organization_id}/${jobId}.csv`;
     const body = new TextEncoder().encode(lines.join("\n"));
@@ -134,6 +159,16 @@ async function buildAndUpload(svc: any, jobId: string, f: Filters): Promise<void
       upsert: true,
     });
     if (upErr) throw upErr;
+    // Final cancellation check — if cancelled after upload, remove the file
+    if (await isCancelRequested(svc, jobId)) {
+      await svc.storage.from("audit-exports").remove([path]).catch(() => {});
+      await svc.from("audit_export_jobs").update({
+        status: "cancelled",
+        completed_at: new Date().toISOString(),
+        row_count: total,
+      }).eq("id", jobId);
+      return;
+    }
     await svc.from("audit_export_jobs").update({
       status: "completed",
       row_count: total,
