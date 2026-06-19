@@ -9,6 +9,7 @@ import { Loader2, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 
 type Participant = {
   id: string;
