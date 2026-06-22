@@ -38,6 +38,11 @@ const RoleManagementPage = () => {
         </div>
       </div>
 
+      <OrganizationCard />
+      <MembershipRequests />
+      <RolePermissionsPanel />
+
+
       <Tabs defaultValue="roles">
         <TabsList>
           <TabsTrigger value="roles">Roles</TabsTrigger>
