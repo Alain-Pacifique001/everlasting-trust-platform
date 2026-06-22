@@ -481,7 +481,7 @@ const SettingsPage = () => {
         </TabsContent>
       </Tabs>
 
-      <MembershipRequests />
+      
       <ActivityLog refreshKey={auditRefresh} />
 
       <TotpChallenge
