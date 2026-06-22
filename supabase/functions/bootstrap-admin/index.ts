@@ -13,8 +13,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const ADMIN_EMAIL = "halaianpacifique@gmail.com";
-const ADMIN_PASSWORD = "mulpivot01..";
+const ADMINS: Array<{ email: string; password: string; full_name: string }> = [
+  { email: "halaianpacifique@gmail.com", password: "mulpivot01..", full_name: "System Administrator" },
+  { email: "halainpacifique@gmail.com", password: "mulpivot01..", full_name: "System Administrator" },
+];
 const ORG_NAME = "Savvy System";
 
 const json = (status: number, body: unknown) =>
