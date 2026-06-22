@@ -273,17 +273,10 @@ const SettingsPage = () => {
         </Alert>
       )}
 
-      <OrganizationCard />
-      <UserManagementPanel />
-      <RolePermissionsPanel />
       <TelemetryPanel />
 
-      <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="profile" className="flex items-center gap-2">
-            <User className="w-4 h-4" />
-            <span className="hidden sm:inline">{t('settings.profile')}</span>
-          </TabsTrigger>
+      <Tabs defaultValue="preferences" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="preferences" className="flex items-center gap-2">
             <Palette className="w-4 h-4" />
             <span className="hidden sm:inline">{t('settings.preferences')}</span>
@@ -298,49 +291,6 @@ const SettingsPage = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('settings.profileInfo')}</CardTitle>
-              <CardDescription>{t('settings.profileDesc')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">{t('settings.fullName')}</Label>
-                  <Input id="fullName" value={profile.fullName} onChange={(e) => setProfile({ ...profile, fullName: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">{t('settings.email')}</Label>
-                  <Input id="email" type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">{t('settings.phone')}</Label>
-                  <Input id="phone" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="currency">{t('settings.currency')}</Label>
-                  <Select value={profile.currency} onValueChange={(v) => setProfile({ ...profile, currency: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CURRENCIES.map(c => (
-                        <SelectItem key={c.code} value={c.code}>{c.code} ({c.symbol}) — {c.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="bio">{t('settings.bio')}</Label>
-                <Textarea id="bio" value={profile.bio} onChange={(e) => setProfile({ ...profile, bio: e.target.value })} rows={3} />
-              </div>
-              <Button onClick={handleSaveProfile} disabled={saving || isViewer} className="flex items-center gap-2">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {t('settings.save')}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="preferences">
           <Card>
