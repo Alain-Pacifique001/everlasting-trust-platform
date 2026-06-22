@@ -2,10 +2,14 @@ import { ShieldCheck } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { UserManagementPanel } from '@/components/settings/UserManagementPanel';
+import { OrganizationCard } from '@/components/settings/OrganizationCard';
+import { MembershipRequests } from '@/components/settings/MembershipRequests';
+import RolePermissionsPanel from '@/components/settings/RolePermissionsPanel';
 import RolesTab from '@/components/rbac/RolesTab';
 import PermissionMatrixTab from '@/components/rbac/PermissionMatrixTab';
 import AuditLogTab from '@/components/rbac/AuditLogTab';
 import AccessDenied from '@/components/AccessDenied';
+
 
 const RoleManagementPage = () => {
   const { hasAnyRole, loading } = useOrganization();
