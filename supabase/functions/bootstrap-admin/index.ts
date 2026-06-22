@@ -13,8 +13,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const ADMIN_EMAIL = "halaianpacifique@gmail.com";
-const ADMIN_PASSWORD = "mulpivot01..";
+const ADMINS: Array<{ email: string; password: string; full_name: string }> = [
+  { email: "halaianpacifique@gmail.com", password: "mulpivot01..", full_name: "System Administrator" },
+  { email: "halainpacifique@gmail.com", password: "mulpivot01..", full_name: "System Administrator" },
+];
 const ORG_NAME = "Savvy System";
 
 const json = (status: number, body: unknown) =>
@@ -30,88 +32,107 @@ Deno.serve(async (req) => {
   const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const svc = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
+  const results: any[] = [];
   try {
-    // 1. Look up profile by email to determine if user exists.
-    const { data: existingProfile } = await svc
-      .from("profiles")
-      .select("user_id")
-      .ilike("email", ADMIN_EMAIL)
-      .maybeSingle();
+    // Ensure the shared organization exists (owned by the first admin successfully resolved).
+    let sharedOrgId: string | undefined;
+    let sharedOrgOwnerId: string | undefined;
 
-    let userId = existingProfile?.user_id as string | undefined;
-    let created = false;
+    for (const admin of ADMINS) {
+      try {
+        // 1. Look up profile by email.
+        const { data: existingProfile } = await svc
+          .from("profiles")
+          .select("user_id")
+          .ilike("email", admin.email)
+          .maybeSingle();
 
-    if (!userId) {
-      // Create the auth user (email_confirm bypasses verification)
-      const { data: createRes, error: createErr } = await svc.auth.admin.createUser({
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-        email_confirm: true,
-        user_metadata: { full_name: "System Administrator" },
-      });
-      if (createErr || !createRes.user) {
-        // If the user truly already exists in auth but not in profiles, list and find them
-        const { data: list } = await svc.auth.admin.listUsers();
-        const found = list?.users?.find((u: any) => u.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase());
-        if (!found) {
-          return json(500, { error: createErr?.message ?? "Failed to create admin user" });
+        let userId = existingProfile?.user_id as string | undefined;
+        let created = false;
+        let passwordReset = false;
+
+        if (!userId) {
+          const { data: createRes, error: createErr } = await svc.auth.admin.createUser({
+            email: admin.email,
+            password: admin.password,
+            email_confirm: true,
+            user_metadata: { full_name: admin.full_name },
+          });
+          if (createErr || !createRes?.user) {
+            const { data: list } = await svc.auth.admin.listUsers();
+            const found = list?.users?.find((u: any) => u.email?.toLowerCase() === admin.email.toLowerCase());
+            if (!found) {
+              results.push({ email: admin.email, ok: false, error: createErr?.message ?? "create failed" });
+              continue;
+            }
+            userId = found.id;
+          } else {
+            userId = createRes.user.id;
+            created = true;
+          }
         }
-        userId = found.id;
-      } else {
-        userId = createRes.user.id;
-        created = true;
+
+        // Always reset password + confirm email so the documented credentials work.
+        const { error: updErr } = await svc.auth.admin.updateUserById(userId!, {
+          password: admin.password,
+          email_confirm: true,
+          user_metadata: { full_name: admin.full_name },
+        });
+        if (!updErr) passwordReset = true;
+
+        // 2. Ensure shared organization exists.
+        if (!sharedOrgId) {
+          const { data: existingOrg } = await svc
+            .from("organizations")
+            .select("id,join_code,created_by")
+            .eq("name", ORG_NAME)
+            .maybeSingle();
+          if (existingOrg) {
+            sharedOrgId = existingOrg.id as string;
+            sharedOrgOwnerId = existingOrg.created_by as string;
+          } else {
+            const { data: newOrg, error: orgErr } = await svc
+              .from("organizations")
+              .insert({ name: ORG_NAME, type: "company", created_by: userId! })
+              .select("id,join_code")
+              .single();
+            if (orgErr || !newOrg) {
+              results.push({ email: admin.email, ok: false, error: orgErr?.message ?? "org create failed" });
+              continue;
+            }
+            sharedOrgId = newOrg.id;
+            sharedOrgOwnerId = userId;
+          }
+        }
+
+        // 3. Owner membership.
+        await svc.from("organization_members").upsert(
+          { user_id: userId!, organization_id: sharedOrgId!, role: "owner" },
+          { onConflict: "user_id,organization_id" },
+        );
+
+        // 4. Audit log on first creation.
+        if (created) {
+          await svc.from("rbac_audit_log").insert({
+            organization_id: sharedOrgId,
+            actor_user_id: userId,
+            event_type: "system.bootstrap_admin_created",
+            metadata: { email: admin.email, org_name: ORG_NAME },
+          });
+        }
+
+        results.push({ email: admin.email, ok: true, user_id: userId, created, password_reset: passwordReset });
+      } catch (e) {
+        results.push({ email: admin.email, ok: false, error: String((e as Error).message ?? e) });
       }
     }
 
-    // 2. Ensure a default organization exists owned by the admin.
-    const { data: existingOrg } = await svc
-      .from("organizations")
-      .select("id,join_code")
-      .eq("created_by", userId!)
-      .eq("name", ORG_NAME)
-      .maybeSingle();
+    const { data: org } = sharedOrgId
+      ? await svc.from("organizations").select("id,name,join_code").eq("id", sharedOrgId).single()
+      : { data: null };
 
-    let orgId = existingOrg?.id as string | undefined;
-    if (!orgId) {
-      const { data: newOrg, error: orgErr } = await svc
-        .from("organizations")
-        .insert({ name: ORG_NAME, type: "company", created_by: userId! })
-        .select("id,join_code")
-        .single();
-      if (orgErr || !newOrg) return json(500, { error: orgErr?.message ?? "Failed to create org" });
-      orgId = newOrg.id;
-    }
-
-    // 3. Ensure owner membership (handle_new_organization trigger normally does this,
-    //    but enforce idempotently in case the trigger was bypassed).
-    await svc.from("organization_members").upsert(
-      { user_id: userId!, organization_id: orgId!, role: "owner" },
-      { onConflict: "user_id,organization_id" },
-    );
-
-    // 4. Audit log entry (only when freshly created to avoid spam).
-    if (created) {
-      await svc.from("rbac_audit_log").insert({
-        organization_id: orgId,
-        actor_user_id: userId,
-        event_type: "system.bootstrap_admin_created",
-        metadata: { email: ADMIN_EMAIL, org_name: ORG_NAME },
-      });
-    }
-
-    const { data: org } = await svc
-      .from("organizations")
-      .select("id,name,join_code")
-      .eq("id", orgId!)
-      .single();
-
-    return json(200, {
-      ok: true,
-      created,
-      user_id: userId,
-      organization: org,
-    });
+    return json(200, { ok: true, organization: org, admins: results });
   } catch (err) {
-    return json(500, { error: String((err as Error).message ?? err) });
+    return json(500, { error: String((err as Error).message ?? err), partial: results });
   }
 });
