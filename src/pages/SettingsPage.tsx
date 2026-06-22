@@ -14,18 +14,15 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCurrency, CURRENCIES, CurrencyCode } from '@/contexts/CurrencyContext';
+import { useCurrency, CurrencyCode } from '@/contexts/CurrencyContext';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import { SettingsSkeleton } from '@/components/settings/SettingsSkeleton';
-import { OrganizationCard } from '@/components/settings/OrganizationCard';
 import { ActivityLog } from '@/components/settings/ActivityLog';
 import { TwoFactorAuth } from '@/components/settings/TwoFactorAuth';
 import { RecoveryCodes } from '@/components/settings/RecoveryCodes';
 import { TotpChallenge } from '@/components/settings/TotpChallenge';
-import { MembershipRequests } from '@/components/settings/MembershipRequests';
-import { UserManagementPanel } from '@/components/settings/UserManagementPanel';
-import RolePermissionsPanel from '@/components/settings/RolePermissionsPanel';
 import TelemetryPanel from '@/components/settings/TelemetryPanel';
+
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { requestPushPermission, sendNotification, watchNotificationPermission, NotificationCategory } from '@/lib/notify';
 
