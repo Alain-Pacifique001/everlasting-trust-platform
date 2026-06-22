@@ -1,34 +1,71 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/sonner';
 
-interface SavingsGoal { id: number; name: string; target: number; saved: number; icon: string; }
-
-const initialGoals: SavingsGoal[] = [
-  { id: 1, name: 'Emergency Fund', target: 10000, saved: 6700, icon: '🛡️' },
-  { id: 2, name: 'Vacation', target: 3000, saved: 1200, icon: '✈️' },
-  { id: 3, name: 'New Laptop', target: 2000, saved: 1800, icon: '💻' },
-  { id: 4, name: 'Car Down Payment', target: 5000, saved: 720, icon: '🚗' },
-];
+interface SavingsGoal { id: string; name: string; target_amount: number; saved_amount: number; icon: string; }
 
 const Savings = () => {
   const { t } = useTranslation();
-  const [goals, setGoals] = useState(initialGoals);
+  const { user } = useAuth();
+  const { organization, canEdit, isViewer } = useOrganization();
+  const [goals, setGoals] = useState<SavingsGoal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newGoal, setNewGoal] = useState({ name: '', target: '' });
 
-  const totalSaved = goals.reduce((s, g) => s + g.saved, 0);
-  const totalTarget = goals.reduce((s, g) => s + g.target, 0);
+  useEffect(() => {
+    if (!organization) return;
+    (async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('savings_goals')
+        .select('id, name, target_amount, saved_amount, icon')
+        .eq('organization_id', organization.id)
+        .order('created_at', { ascending: false });
+      if (error) toast.error(error.message);
+      else setGoals((data ?? []).map((g: any) => ({ ...g, target_amount: Number(g.target_amount), saved_amount: Number(g.saved_amount) })));
+      setLoading(false);
+    })();
+  }, [organization]);
 
-  const handleAdd = () => {
-    if (!newGoal.name || !newGoal.target) return;
-    setGoals((prev) => [...prev, { id: Date.now(), name: newGoal.name, target: parseFloat(newGoal.target), saved: 0, icon: '🎯' }]);
+  const totalSaved = goals.reduce((s, g) => s + g.saved_amount, 0);
+  const totalTarget = goals.reduce((s, g) => s + g.target_amount, 0);
+
+  const handleAdd = async () => {
+    if (!newGoal.name || !newGoal.target || !organization || !user) return;
+    setSaving(true);
+    const { data, error } = await supabase
+      .from('savings_goals')
+      .insert({
+        organization_id: organization.id,
+        user_id: user.id,
+        name: newGoal.name,
+        target_amount: parseFloat(newGoal.target),
+        icon: '🎯',
+      })
+      .select('id, name, target_amount, saved_amount, icon')
+      .single();
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    setGoals((prev) => [{ ...(data as any), target_amount: Number(data!.target_amount), saved_amount: Number(data!.saved_amount) }, ...prev]);
     setNewGoal({ name: '', target: '' });
     setDialogOpen(false);
+    toast.success('Goal created');
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from('savings_goals').delete().eq('id', id);
+    if (error) { toast.error(error.message); return; }
+    setGoals((prev) => prev.filter((g) => g.id !== id));
   };
 
   return (
@@ -40,14 +77,17 @@ const Savings = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-2" />{t('savings.newGoal')}</Button>
+            <Button disabled={isViewer}><Plus className="w-4 h-4 mr-2" />{t('savings.newGoal')}</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{t('savings.createGoal')}</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <Input placeholder={t('savings.goalName')} value={newGoal.name} onChange={(e) => setNewGoal((p) => ({ ...p, name: e.target.value }))} />
               <Input type="number" placeholder={t('savings.targetAmount')} value={newGoal.target} onChange={(e) => setNewGoal((p) => ({ ...p, target: e.target.value }))} />
-              <Button onClick={handleAdd} className="w-full">{t('savings.create')}</Button>
+              <Button onClick={handleAdd} disabled={saving} className="w-full">
+                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                {t('savings.create')}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -58,34 +98,47 @@ const Savings = () => {
         <p className="text-2xl font-bold text-card-foreground">${totalSaved.toLocaleString()} / ${totalTarget.toLocaleString()}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {goals.map((goal, i) => {
-          const pct = Math.min((goal.saved / goal.target) * 100, 100);
-          return (
-            <motion.div
-              key={goal.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.05 }}
-              className="rounded-xl border border-border bg-card p-5"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-2xl">{goal.icon}</span>
-                <div>
-                  <h3 className="font-semibold text-card-foreground">{goal.name}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    ${goal.saved.toLocaleString()} {t('savings.of')} ${goal.target.toLocaleString()}
-                  </p>
+      {loading ? (
+        <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+      ) : goals.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground py-10">No savings goals yet.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {goals.map((goal, i) => {
+            const pct = goal.target_amount > 0 ? Math.min((goal.saved_amount / goal.target_amount) * 100, 100) : 0;
+            return (
+              <motion.div
+                key={goal.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.05 }}
+                className="rounded-xl border border-border bg-card p-5"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{goal.icon}</span>
+                    <div>
+                      <h3 className="font-semibold text-card-foreground">{goal.name}</h3>
+                      <p className="text-xs text-muted-foreground">
+                        ${goal.saved_amount.toLocaleString()} {t('savings.of')} ${goal.target_amount.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  {canEdit && (
+                    <Button size="icon" variant="ghost" onClick={() => handleDelete(goal.id)} title="Delete">
+                      <Trash2 className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                  )}
                 </div>
-              </div>
-              <div className="w-full bg-secondary rounded-full h-2">
-                <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">{pct.toFixed(0)}% {t('savings.saved')}</p>
-            </motion.div>
-          );
-        })}
-      </div>
+                <div className="w-full bg-secondary rounded-full h-2">
+                  <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">{pct.toFixed(0)}% {t('savings.saved')}</p>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
