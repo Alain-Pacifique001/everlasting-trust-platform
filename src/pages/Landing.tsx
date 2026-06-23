@@ -337,6 +337,7 @@ const Landing = () => {
             </CardContent>
           </Card>
         </div>
+        <ContactForm />
       </section>
 
       <footer className="border-t border-border/60 mt-12">
