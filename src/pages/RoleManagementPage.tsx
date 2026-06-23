@@ -1,5 +1,7 @@
-import { ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
+import { ShieldCheck, Minus, Maximize2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { UserManagementPanel } from '@/components/settings/UserManagementPanel';
 import { OrganizationCard } from '@/components/settings/OrganizationCard';
