@@ -517,6 +517,7 @@ export default function VoiceBriefings() {
           )}
         </div>
       </CardContent>
+      )}
     </Card>
   );
 }
