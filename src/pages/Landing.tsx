@@ -34,6 +34,82 @@ const NavLinks = () => (
   </>
 );
 
+const ContactForm = () => {
+  const [category, setCategory] = useState<'idea' | 'support'>('idea');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || !message.trim()) {
+      toast.error('Please fill in name, email and message');
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await supabase.from('contact_messages').insert({
+      name: name.trim(), email: email.trim(), category, subject: subject.trim() || null, message: message.trim(),
+    });
+    setSubmitting(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(category === 'idea' ? 'Thanks for sharing your idea!' : 'Support request received — we will reply soon');
+    setName(''); setEmail(''); setSubject(''); setMessage('');
+  };
+
+  return (
+    <Card className="max-w-3xl mx-auto mt-10">
+      <CardContent className="p-6">
+        <div className="flex flex-col sm:flex-row gap-2 mb-5">
+          <button
+            type="button"
+            onClick={() => setCategory('idea')}
+            className={`flex-1 inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition ${category === 'idea' ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}
+          >
+            <Lightbulb className="w-4 h-4" /> Share an idea
+          </button>
+          <button
+            type="button"
+            onClick={() => setCategory('support')}
+            className={`flex-1 inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition ${category === 'support' ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}
+          >
+            <LifeBuoy className="w-4 h-4" /> Request support
+          </button>
+        </div>
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="cm-name">Your name</Label>
+              <Input id="cm-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cm-email">Email</Label>
+              <Input id="cm-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} required />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cm-subject">Subject (optional)</Label>
+            <Input id="cm-subject" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={200}
+              placeholder={category === 'idea' ? 'Idea title…' : 'What do you need help with?'} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cm-message">{category === 'idea' ? 'Your idea' : 'Describe the issue'}</Label>
+            <Textarea id="cm-message" rows={5} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={4000} required
+              placeholder={category === 'idea'
+                ? 'Tell us what you would like Savvy AI to do…'
+                : 'Share steps to reproduce, screenshots, or any details that help us assist you.'} />
+          </div>
+          <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
+            {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+            {category === 'idea' ? 'Submit idea' : 'Send support request'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+};
+
 const Landing = () => {
   const { user } = useAuth();
   return (
