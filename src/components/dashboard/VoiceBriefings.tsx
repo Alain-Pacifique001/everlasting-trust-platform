@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Play, Pause, SkipForward, AudioLines, Plus, Search, Clock,
-  CheckCircle2, Loader2, Mic, Square, Users, X,
+  CheckCircle2, Loader2, Mic, Square, Users, X, Minus, Maximize2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
