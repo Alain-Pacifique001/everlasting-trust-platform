@@ -257,7 +257,7 @@ const AuthPage = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center relative">
           <Link
-            to="/dashboard"
+            to="/"
             className="absolute left-4 top-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Home
