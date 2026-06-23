@@ -1,11 +1,17 @@
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import {
   Sparkles, ShieldCheck, BarChart3, Users, ArrowRight, Building2,
-  Target, Eye, Phone, Mail, MessageCircle, CheckCircle2,
+  Target, Eye, Phone, Mail, MessageCircle, CheckCircle2, Lightbulb, LifeBuoy, Send, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/sonner';
 
 const CONTACT_PHONE = '+250 798 254 398';
 const CONTACT_PHONE_RAW = '0798254398';
