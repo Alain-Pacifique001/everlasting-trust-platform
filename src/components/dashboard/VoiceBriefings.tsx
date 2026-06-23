@@ -77,6 +77,7 @@ export default function VoiceBriefings() {
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [minimized, setMinimized] = useState(false);
 
   useEffect(() => () => {
     window.speechSynthesis?.cancel();
