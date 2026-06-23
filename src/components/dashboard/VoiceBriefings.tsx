@@ -294,89 +294,103 @@ export default function VoiceBriefings() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className={minimized ? 'pb-3' : undefined}>
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-base flex items-center gap-2">
             <AudioLines className="w-4 h-4 text-primary" /> AI Voice Briefings
           </CardTitle>
-          {canManage && (
-            <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="gap-1">
-                  <Plus className="w-3.5 h-3.5" /> New
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader><DialogTitle>New voice briefing</DialogTitle></DialogHeader>
-                <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                  <Input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-                  <Textarea rows={5} placeholder="Briefing script (optional if recording audio)…" value={form.script}
-                    onChange={(e) => setForm({ ...form, script: e.target.value })} />
-
-                  <div className="rounded-md border p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium flex items-center gap-2">
-                        <Mic className="w-4 h-4" /> Record your voice
-                      </span>
-                      {!recording && !recordedBlob && (
-                        <Button size="sm" variant="outline" onClick={startRecording}>Start</Button>
-                      )}
-                      {recording && (
-                        <Button size="sm" variant="destructive" onClick={stopRecording} className="gap-1">
-                          <Square className="w-3 h-3" /> Stop
-                        </Button>
-                      )}
-                      {recordedBlob && !recording && (
-                        <Button size="sm" variant="ghost" onClick={discardRecording} className="gap-1">
-                          <X className="w-3 h-3" /> Discard
-                        </Button>
-                      )}
-                    </div>
-                    {recording && <p className="text-xs text-destructive">● Recording…</p>}
-                    {recordedUrl && <audio src={recordedUrl} controls className="w-full" />}
-                  </div>
-
-                  <div className="rounded-md border p-3 space-y-2">
-                    <div className="text-sm font-medium flex items-center gap-2">
-                      <Users className="w-4 h-4" /> Recipients
-                      <span className="text-xs text-muted-foreground font-normal">
-                        ({recipients.size === 0 ? 'all organization members' : `${recipients.size} selected`})
-                      </span>
-                    </div>
-                    <div className="max-h-40 overflow-y-auto space-y-1">
-                      {members.filter((m) => m.user_id !== user?.id).map((m) => (
-                        <label key={m.user_id} className="flex items-center gap-2 text-sm p-1.5 rounded hover:bg-accent/40 cursor-pointer">
-                          <Checkbox
-                            checked={recipients.has(m.user_id)}
-                            onCheckedChange={(v) => {
-                              setRecipients((prev) => {
-                                const next = new Set(prev);
-                                if (v) next.add(m.user_id); else next.delete(m.user_id);
-                                return next;
-                              });
-                            }}
-                          />
-                          <span className="flex-1 truncate">{m.full_name}</span>
-                          <span className="text-xs text-muted-foreground truncate">{m.email}</span>
-                        </label>
-                      ))}
-                      {members.length <= 1 && (
-                        <p className="text-xs text-muted-foreground">No teammates yet.</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => { setOpen(false); resetForm(); }}>Cancel</Button>
-                  <Button onClick={createBriefing} disabled={saving || !form.title.trim()}>
-                    {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Create
+          <div className="flex items-center gap-1">
+            {canManage && !minimized && (
+              <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="gap-1">
+                    <Plus className="w-3.5 h-3.5" /> New
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader><DialogTitle>New voice briefing</DialogTitle></DialogHeader>
+                  <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                    <Input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                    <Textarea rows={5} placeholder="Briefing script (optional if recording audio)…" value={form.script}
+                      onChange={(e) => setForm({ ...form, script: e.target.value })} />
+
+                    <div className="rounded-md border p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <Mic className="w-4 h-4" /> Record your voice
+                        </span>
+                        {!recording && !recordedBlob && (
+                          <Button size="sm" variant="outline" onClick={startRecording}>Start</Button>
+                        )}
+                        {recording && (
+                          <Button size="sm" variant="destructive" onClick={stopRecording} className="gap-1">
+                            <Square className="w-3 h-3" /> Stop
+                          </Button>
+                        )}
+                        {recordedBlob && !recording && (
+                          <Button size="sm" variant="ghost" onClick={discardRecording} className="gap-1">
+                            <X className="w-3 h-3" /> Discard
+                          </Button>
+                        )}
+                      </div>
+                      {recording && <p className="text-xs text-destructive">● Recording…</p>}
+                      {recordedUrl && <audio src={recordedUrl} controls className="w-full" />}
+                    </div>
+
+                    <div className="rounded-md border p-3 space-y-2">
+                      <div className="text-sm font-medium flex items-center gap-2">
+                        <Users className="w-4 h-4" /> Recipients
+                        <span className="text-xs text-muted-foreground font-normal">
+                          ({recipients.size === 0 ? 'all organization members' : `${recipients.size} selected`})
+                        </span>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto space-y-1">
+                        {members.filter((m) => m.user_id !== user?.id).map((m) => (
+                          <label key={m.user_id} className="flex items-center gap-2 text-sm p-1.5 rounded hover:bg-accent/40 cursor-pointer">
+                            <Checkbox
+                              checked={recipients.has(m.user_id)}
+                              onCheckedChange={(v) => {
+                                setRecipients((prev) => {
+                                  const next = new Set(prev);
+                                  if (v) next.add(m.user_id); else next.delete(m.user_id);
+                                  return next;
+                                });
+                              }}
+                            />
+                            <span className="flex-1 truncate">{m.full_name}</span>
+                            <span className="text-xs text-muted-foreground truncate">{m.email}</span>
+                          </label>
+                        ))}
+                        {members.length <= 1 && (
+                          <p className="text-xs text-muted-foreground">No teammates yet.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => { setOpen(false); resetForm(); }}>Cancel</Button>
+                    <Button onClick={createBriefing} disabled={saving || !form.title.trim()}>
+                      {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Create
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => setMinimized((v) => !v)}
+              aria-label={minimized ? 'Expand' : 'Minimize'}
+              title={minimized ? 'Expand' : 'Minimize'}
+            >
+              {minimized ? <Maximize2 className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
         </div>
       </CardHeader>
+      {!minimized && (
+
       <CardContent className="space-y-4">
         {loading ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
