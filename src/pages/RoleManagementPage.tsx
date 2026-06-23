@@ -16,6 +16,7 @@ import AccessDenied from '@/components/AccessDenied';
 const RoleManagementPage = () => {
   const { hasAnyRole, loading } = useOrganization();
   const isAdmin = hasAnyRole(['owner', 'ceo']);
+  const [minimized, setMinimized] = useState(false);
 
   if (loading) return null;
   if (!isAdmin) {
@@ -32,31 +33,46 @@ const RoleManagementPage = () => {
         <div className="p-2 rounded-lg bg-primary/10 text-primary">
           <ShieldCheck className="w-5 h-5" />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold text-foreground">Role &amp; Permission Management</h1>
-          <p className="text-muted-foreground">
-            Create custom roles, fine-tune the permission matrix, assign roles to users, and review the audit trail — all without touching the database.
-          </p>
+          {!minimized && (
+            <p className="text-muted-foreground">
+              Create custom roles, fine-tune the permission matrix, assign roles to users, and review the audit trail — all without touching the database.
+            </p>
+          )}
         </div>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 shrink-0"
+          onClick={() => setMinimized((v) => !v)}
+          aria-label={minimized ? 'Expand' : 'Minimize'}
+          title={minimized ? 'Expand' : 'Minimize'}
+        >
+          {minimized ? <Maximize2 className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+        </Button>
       </div>
 
-      <OrganizationCard />
-      <MembershipRequests />
-      <RolePermissionsPanel />
+      {!minimized && (
+        <>
+          <OrganizationCard />
+          <MembershipRequests />
+          <RolePermissionsPanel />
 
-
-      <Tabs defaultValue="roles">
-        <TabsList>
-          <TabsTrigger value="roles">Roles</TabsTrigger>
-          <TabsTrigger value="permissions">Permissions</TabsTrigger>
-          <TabsTrigger value="users">User assignments</TabsTrigger>
-          <TabsTrigger value="audit">Audit log</TabsTrigger>
-        </TabsList>
-        <TabsContent value="roles" className="mt-4"><RolesTab /></TabsContent>
-        <TabsContent value="permissions" className="mt-4"><PermissionMatrixTab /></TabsContent>
-        <TabsContent value="users" className="mt-4"><UserManagementPanel /></TabsContent>
-        <TabsContent value="audit" className="mt-4"><AuditLogTab /></TabsContent>
-      </Tabs>
+          <Tabs defaultValue="roles">
+            <TabsList>
+              <TabsTrigger value="roles">Roles</TabsTrigger>
+              <TabsTrigger value="permissions">Permissions</TabsTrigger>
+              <TabsTrigger value="users">User assignments</TabsTrigger>
+              <TabsTrigger value="audit">Audit log</TabsTrigger>
+            </TabsList>
+            <TabsContent value="roles" className="mt-4"><RolesTab /></TabsContent>
+            <TabsContent value="permissions" className="mt-4"><PermissionMatrixTab /></TabsContent>
+            <TabsContent value="users" className="mt-4"><UserManagementPanel /></TabsContent>
+            <TabsContent value="audit" className="mt-4"><AuditLogTab /></TabsContent>
+          </Tabs>
+        </>
+      )}
     </div>
   );
 };
